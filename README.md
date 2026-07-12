@@ -22,9 +22,30 @@ hit along the way. Treat it as a sense of scale, not a stopwatch.
 
 ## Install
 
+Run these one at a time (don't paste them as one block — if they land as a
+single input, the second line gets appended onto the first and errors out):
+
 ```
-/plugin marketplace add ben564885/claude-eta
+/plugin marketplace add https://github.com/ben564885/claude-eta
+```
+
+Use the full `https://` URL, not the `ben564885/claude-eta` shorthand — the
+shorthand form makes Claude Code clone over SSH, which fails with
+`SSH authentication failed` unless you already have SSH keys set up for
+GitHub. The `https://` URL sidesteps that entirely.
+
+Once that confirms, install the plugin:
+
+```
 /plugin install claude-eta@claude-eta
+```
+
+You'll be asked which scope to install into — **user scope** ("Install for
+you") is the right choice for a personal tool like this; it's already
+highlighted, so just press Enter. Then apply it:
+
+```
+/reload-plugins
 ```
 
 That's it for the instant estimate — the moment you submit a prompt you'll
@@ -33,21 +54,40 @@ see a message like `⏱ est. ~1m–6m`.
 ## Get the live countdown (one extra step)
 
 Claude Code doesn't currently let a plugin auto-install a statusline, so this
-part is a one-time manual step. Add this to your own `~/.claude/settings.json`:
+part is a one-time manual step.
+
+**1. Open `~/.claude/settings.json`.** This is a hidden file in your home
+directory (`~`, not your project folder) — if you're browsing for it in an
+editor's file tree, it won't show up unless you open `~/.claude` directly or
+show hidden files. Easiest is opening it by path, e.g. `code ~/.claude/settings.json`
+or `cursor ~/.claude/settings.json` from a terminal.
+
+**2. Add a `statusLine` key.** If the file already has other settings in it
+(most will, e.g. `permissions`, `hooks`), add `statusLine` alongside them —
+don't replace the whole file. `$CLAUDE_PLUGIN_ROOT` is not reliably expanded
+in this context, so use the actual installed path instead of the variable.
+Find it with:
+
+```
+find ~/.claude/plugins -iname "statusline.mjs"
+```
+
+That'll print something like
+`~/.claude/plugins/cache/claude-eta/claude-eta/1.1.0/scripts/statusline.mjs`
+(the version number in the path bumps on plugin updates). Use that exact path:
 
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "node \"$CLAUDE_PLUGIN_ROOT/scripts/statusline.mjs\""
+    "command": "node \"/absolute/path/to/scripts/statusline.mjs\""
   }
 }
 ```
 
-If `$CLAUDE_PLUGIN_ROOT` doesn't expand in your settings context, replace it
-with the absolute path to where the plugin got installed. Without this step
-claude-eta still works fine — you just get the instant estimate at submit
-time, not the ticking countdown.
+**3. Restart Claude Code** (or start a new session) for the statusline to
+pick up. Without this step claude-eta still works fine — you just get the
+instant estimate at submit time, not the ticking countdown.
 
 ## What you'll see
 
