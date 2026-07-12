@@ -1,0 +1,636 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>claude-eta — a live ETA for your Claude Code runs</title>
+<meta name="description" content="A live ETA for your Claude Code runs. An instant range at submit, a statusline countdown that widens the moment a run hits trouble. Zero network calls.">
+<meta property="og:title" content="claude-eta — a live ETA for your Claude Code runs">
+<meta property="og:description" content="An instant range at submit, a statusline countdown that widens the moment a run hits trouble. Zero network calls, nothing leaves your machine.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%8F%B1%3C/text%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #faf9f6;
+    --bg-raised: #f2f0ea;
+    --ink: #1b1c1a;
+    --ink-soft: #55564f;
+    --ink-faint: #8c8d84;
+    --rule: #dedad0;
+    --amber: #c4692a;
+    --amber-soft: #f3e2d1;
+    --green: #3f7a58;
+    --green-soft: #dfe9e1;
+    --shadow: 0 1px 0 rgba(27, 28, 26, 0.04);
+
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+
+    --content-w: 44rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #171815;
+      --bg-raised: #1f201c;
+      --ink: #ece9e1;
+      --ink-soft: #a8a89e;
+      --ink-faint: #6f6f66;
+      --rule: #34342e;
+      --amber: #e08a45;
+      --amber-soft: #3a2c1c;
+      --green: #6fb98f;
+      --green-soft: #1f2d24;
+      --shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+    }
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--amber-soft); color: var(--ink); }
+
+  a { color: inherit; }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--amber);
+    outline-offset: 3px;
+  }
+
+  .wrap {
+    max-width: var(--content-w);
+    margin: 0 auto;
+    padding: 0 1.5rem;
+  }
+
+  /* ---------- header ---------- */
+
+  header.site {
+    padding: 1.75rem 0;
+    border-bottom: 1px solid var(--rule);
+  }
+  header.site .wrap {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .wordmark {
+    font-family: var(--font-mono);
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+  .wordmark .dim { color: var(--ink-faint); }
+  .site-link {
+    font-size: 0.8125rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-bottom: 1px solid var(--rule);
+    transition: color 0.15s ease, border-color 0.15s ease;
+  }
+  .site-link:hover { color: var(--ink); border-color: var(--ink-soft); }
+
+  /* ---------- hero ---------- */
+
+  .hero { padding: 4.5rem 0 3.5rem; }
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 1.25rem;
+  }
+  h1 {
+    font-size: clamp(2.1rem, 1.6rem + 2vw, 3rem);
+    line-height: 1.08;
+    letter-spacing: -0.02em;
+    font-weight: 650;
+    margin: 0 0 1.1rem;
+    text-wrap: balance;
+    max-width: 20ch;
+  }
+  .lede {
+    font-size: 1.1875rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    max-width: 38rem;
+    margin: 0 0 2.5rem;
+    text-wrap: pretty;
+  }
+
+  /* ---------- statusline demo widget ---------- */
+
+  .demo {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    margin-bottom: 2.75rem;
+  }
+  .demo-label {
+    font-size: 0.75rem;
+    color: var(--ink-faint);
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+    min-height: 1.2em;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    font-variant-numeric: tabular-nums;
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 0.85rem 1.1rem;
+    width: fit-content;
+    max-width: 100%;
+    box-shadow: var(--shadow);
+  }
+  .chip .time { min-width: 5.5ch; }
+  .chip .bar {
+    width: 6.5rem;
+    height: 0.5rem;
+    border-radius: 3px;
+    background: var(--rule);
+    overflow: hidden;
+    flex: none;
+  }
+  .chip .bar-fill {
+    height: 100%;
+    background: var(--ink-soft);
+    border-radius: 3px;
+    transition: width 0.6s ease, background-color 0.3s ease;
+  }
+  .chip.warn .bar-fill { background: var(--amber); }
+  .chip .phase {
+    color: var(--ink-soft);
+    font-size: 0.9375rem;
+  }
+  .chip.warn .phase { color: var(--amber); }
+  .chip .warncount {
+    font-size: 0.9375rem;
+    color: var(--amber);
+    opacity: 0;
+    transition: opacity 0.2s ease;
+  }
+  .chip.warn .warncount { opacity: 1; }
+  .chip.pulse { animation: pulse 0.5s ease; }
+  @keyframes pulse {
+    0% { border-color: var(--amber); }
+    100% { border-color: var(--rule); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .chip.pulse { animation: none; }
+    .chip .bar-fill { transition: none; }
+  }
+
+  .cta-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    align-items: center;
+  }
+  .copy-btn {
+    font-family: var(--font-mono);
+    font-size: 0.875rem;
+    background: var(--ink);
+    color: var(--bg);
+    border: 1px solid var(--ink);
+    border-radius: 7px;
+    padding: 0.7rem 1.1rem;
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+  }
+  .copy-btn:hover { opacity: 0.85; }
+  .copy-btn:active { opacity: 0.7; }
+  .cta-note {
+    font-size: 0.8125rem;
+    color: var(--ink-faint);
+  }
+
+  /* ---------- sections ---------- */
+
+  section {
+    padding: 3rem 0;
+    border-top: 1px solid var(--rule);
+  }
+  .eyebrow.section-eyebrow { margin-bottom: 0.75rem; }
+  h2 {
+    font-size: 1.375rem;
+    font-weight: 650;
+    letter-spacing: -0.01em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  p { margin: 0 0 1rem; max-width: 40rem; color: var(--ink); }
+  section p.dim { color: var(--ink-soft); }
+  p:last-child { margin-bottom: 0; }
+
+  code.inline {
+    font-family: var(--font-mono);
+    font-size: 0.875em;
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: 0.1em 0.4em;
+  }
+
+  pre.block {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.7;
+    background: var(--bg-raised);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    overflow-x: auto;
+    margin: 0 0 1rem;
+  }
+  pre.block .g { color: var(--green); }
+  pre.block .a { color: var(--amber); }
+
+  /* steps */
+  ol.steps {
+    list-style: none;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    counter-reset: step;
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  ol.steps li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 1.75rem 1fr;
+    gap: 0.9rem;
+    max-width: 40rem;
+  }
+  ol.steps li::before {
+    content: counter(step);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--ink-faint);
+    border: 1px solid var(--rule);
+    border-radius: 50%;
+    width: 1.75rem;
+    height: 1.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  ol.steps .step-body p { margin: 0.35rem 0 0; }
+  ol.steps .step-body p:first-child { margin-top: 0; }
+
+  /* two-up */
+  .split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
+  @media (max-width: 34rem) {
+    .split { grid-template-columns: 1fr; }
+  }
+  .split h3 {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+    font-weight: 500;
+    margin: 0 0 0.75rem;
+  }
+
+  /* hooks list */
+  .hooks {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    margin-top: 1.5rem;
+  }
+  .hook {
+    display: grid;
+    grid-template-columns: 9.5rem 1fr;
+    gap: 1rem;
+    padding: 0.9rem 0;
+    border-top: 1px solid var(--rule);
+  }
+  .hook:first-child { border-top: none; padding-top: 0; }
+  .hook .name {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--ink);
+    padding-top: 0.15rem;
+  }
+  .hook p { margin: 0; font-size: 0.9375rem; color: var(--ink-soft); }
+  @media (max-width: 30rem) {
+    .hook { grid-template-columns: 1fr; gap: 0.35rem; }
+  }
+
+  /* footer */
+  footer {
+    padding: 2.5rem 0 3.5rem;
+    border-top: 1px solid var(--rule);
+  }
+  footer .wrap {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 1rem;
+    font-size: 0.8125rem;
+    color: var(--ink-faint);
+  }
+  footer a {
+    color: var(--ink-soft);
+    text-decoration: none;
+    border-bottom: 1px solid var(--rule);
+  }
+  footer a:hover { color: var(--ink); border-color: var(--ink-soft); }
+</style>
+</head>
+<body>
+
+<header class="site">
+  <div class="wrap">
+    <div class="wordmark">claude-eta<span class="dim">.plugin</span></div>
+    <a class="site-link" href="https://github.com/ben564885/claude-eta" target="_blank" rel="noopener">Source on GitHub ↗</a>
+  </div>
+</header>
+
+<main>
+  <section class="hero" style="border-top: none;">
+    <div class="wrap">
+      <p class="eyebrow">Claude Code plugin</p>
+      <h1>A live ETA for your Claude Code runs.</h1>
+      <p class="lede">
+        The moment you submit a prompt, you get an instant range. As Claude works,
+        a statusline countdown ticks down — and widens the second the run hits
+        trouble: an error surfaces, a test fails, a debug spiral starts.
+      </p>
+
+      <div class="demo">
+        <div class="demo-label" id="demo-label">at submit</div>
+        <div class="chip" id="chip">
+          <span class="time" id="chip-time">⏱ est. ~1m–6m</span>
+        </div>
+      </div>
+
+      <div class="cta-row">
+        <button class="copy-btn" id="copy-btn" data-copy="/plugin marketplace add https://github.com/ben564885/claude-eta">
+          Copy install command
+        </button>
+        <span class="cta-note">Runs entirely on your machine. No network calls.</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow section-eyebrow">Why</p>
+      <h2>Agent runs are heavy-tailed.</h2>
+      <p>
+        Most of what decides how long a run takes is work that doesn't exist yet
+        at the moment you hit enter — you can't know there's a failing test three
+        tool calls out. So claude-eta never shows a fake-precise number. It shows
+        a <strong>range</strong> up front, then sharpens that range as real evidence
+        comes in: which phase Claude is in, how many tool calls it's made, and how
+        many errors it's hit along the way.
+      </p>
+      <p class="dim">Treat it as a sense of scale, not a stopwatch.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow section-eyebrow">What you'll see</p>
+      <h2>An estimate that reacts to the run, not just the clock.</h2>
+      <div class="split">
+        <div>
+          <h3>At submit</h3>
+          <p style="font-size:0.9375rem;">
+            An instant range based on your prompt's length, file references,
+            and intent — plus the model and mode you're running.
+          </p>
+        </div>
+        <div>
+          <h3>While Claude works</h3>
+          <p style="font-size:0.9375rem;">
+            A statusline countdown that shrinks as time passes, and jumps back
+            <em>up</em> when the run hits trouble.
+          </p>
+        </div>
+      </div>
+      <pre class="block">⏱ ~3m10s left ███░░░░░ <span class="a">dbg +2⚠</span></pre>
+      <p class="dim">
+        <code class="inline">dbg</code> is the phase Claude's currently in
+        (<code class="inline">exp</code> / <code class="inline">edit</code> /
+        <code class="inline">tst</code> / <code class="inline">dbg</code> /
+        <code class="inline">oth</code>). <code class="inline">+2⚠</code> means
+        two issues have shown up since submit — that's what just widened the ETA.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow section-eyebrow">Install</p>
+      <h2>Two commands, then reload.</h2>
+      <ol class="steps">
+        <li>
+          <div class="step-body">
+            <pre class="block">/plugin marketplace add https://github.com/ben564885/claude-eta</pre>
+            <p class="dim">Use the full <code class="inline">https://</code> URL — the shorthand form clones over SSH and fails without keys already configured.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-body">
+            <pre class="block">/plugin install claude-eta@claude-eta</pre>
+            <p class="dim">Choose <strong>user scope</strong> when asked — it's already highlighted, so just press enter.</p>
+          </div>
+        </li>
+        <li>
+          <div class="step-body">
+            <pre class="block">/reload-plugins</pre>
+            <p class="dim">That's it for the instant estimate. Next prompt you submit shows <code class="inline">⏱ est. ~1m–6m</code>.</p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow section-eyebrow">Get the live countdown</p>
+      <h2>One manual step — plugins can't install a statusline yet.</h2>
+      <p class="dim">
+        Add a <code class="inline">statusLine</code> key to
+        <code class="inline">~/.claude/settings.json</code> pointing at the
+        installed <code class="inline">statusline.mjs</code>, then restart
+        Claude Code. Without this step claude-eta still works fine — you just
+        get the instant estimate, not the ticking countdown.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow section-eyebrow">Calibration</p>
+      <h2>It learns from your own runs.</h2>
+      <p>
+        Every finished run reports its predicted-vs-actual time back to a small
+        local calibration file. claude-eta tracks a running correction factor
+        per model-and-mode combination — <code class="inline">opus:normal</code>
+        runs consistently longer than predicted, so future estimates for it
+        scale up — blended with a global fallback so one noisy run doesn't
+        overcorrect everything.
+      </p>
+      <pre class="block">claude-eta — 14 runs logged
+
+  median error:                  38%
+  median actual/predicted ratio: 1.12x
+
+  learned calibration (global): 1.15x over 14 runs
+
+  by model:mode bucket:
+    opus:normal        <span class="a">1.34x</span>  (n=6)
+    sonnet:normal       <span class="g">0.92x</span>  (n=8)</pre>
+      <p class="dim">
+        Check it any time with <code class="inline">/eta-stats</code>, or wipe
+        the calibration and start over with <code class="inline">/eta-reset</code>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow section-eyebrow">How it works</p>
+      <h2>Three hooks, one small state file per session.</h2>
+      <div class="hooks">
+        <div class="hook">
+          <div class="name">UserPromptSubmit</div>
+          <p>Computes the instant estimate from heuristics and learned calibration, writes fresh session state. Pure local computation.</p>
+        </div>
+        <div class="hook">
+          <div class="name">PostToolUse</div>
+          <p>Fires after every tool call, classifies it into a phase — explore, edit, test, debug, other — and revises the estimate as issues and phase time accumulate.</p>
+        </div>
+        <div class="hook">
+          <div class="name">Stop</div>
+          <p>Closes out the run, appends one row to the local history file, and reports the predicted-vs-actual outcome back to the calibration file.</p>
+        </div>
+      </div>
+      <p class="dim" style="margin-top:1.5rem;">
+        Zero runtime dependencies, zero network calls — plain Node.js reading
+        and writing local JSON under <code class="inline">~/.claude/eta/</code>.
+      </p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <p class="eyebrow section-eyebrow">Privacy</p>
+      <h2>Only the shape of a run is recorded.</h2>
+      <p class="dim">
+        Model, mode, prompt length, file-reference count, phase timings,
+        tool and issue counts, durations, and the predicted-vs-actual timing
+        used for calibration. <strong style="color:var(--ink);">Prompt text
+        and tool output are never stored, anywhere.</strong> Nothing leaves
+        your machine.
+      </p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>claude-eta · MIT licensed</span>
+    <a href="https://github.com/ben564885/claude-eta" target="_blank" rel="noopener">github.com/ben564885/claude-eta</a>
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    var chip = document.getElementById("chip");
+    var label = document.getElementById("demo-label");
+
+    var frames = [
+      { mode: "estimate", label: "at submit", time: "⏱ est. ~1m–6m" },
+      { mode: "estimate", label: "at submit", time: "⏱ est. ~1m–6m" },
+      { mode: "live", label: "3 tool calls in", time: "⏱ ~3m10s left", bar: 8,  phase: "exp",  warn: 0 },
+      { mode: "live", label: "6 tool calls in", time: "⏱ ~2m55s left", bar: 15, phase: "exp",  warn: 0 },
+      { mode: "live", label: "editing files",   time: "⏱ ~2m40s left", bar: 25, phase: "edit", warn: 0 },
+      { mode: "live", label: "editing files",   time: "⏱ ~2m22s left", bar: 35, phase: "edit", warn: 0 },
+      { mode: "live", label: "editing files",   time: "⏱ ~2m05s left", bar: 45, phase: "edit", warn: 0 },
+      { mode: "live", label: "running tests",   time: "⏱ ~1m48s left", bar: 55, phase: "tst",  warn: 0 },
+      { mode: "live", label: "running tests",   time: "⏱ ~1m30s left", bar: 62, phase: "tst",  warn: 0 },
+      { mode: "live", label: "a test just failed", time: "⏱ ~2m45s left", bar: 40, phase: "dbg", warn: 1, pulse: true },
+      { mode: "live", label: "debugging",       time: "⏱ ~2m28s left", bar: 46, phase: "dbg", warn: 1 },
+      { mode: "live", label: "debugging",       time: "⏱ ~2m10s left", bar: 53, phase: "dbg", warn: 1 },
+      { mode: "live", label: "hit another error", time: "⏱ ~2m50s left", bar: 48, phase: "dbg", warn: 2, pulse: true },
+      { mode: "live", label: "debugging",       time: "⏱ ~2m33s left", bar: 54, phase: "dbg", warn: 2 },
+      { mode: "live", label: "back to tests",   time: "⏱ ~2m12s left", bar: 66, phase: "tst", warn: 2 },
+      { mode: "live", label: "tests passing",   time: "⏱ ~1m40s left", bar: 78, phase: "tst", warn: 2 },
+      { mode: "live", label: "tests passing",   time: "⏱ ~0m58s left", bar: 90, phase: "tst", warn: 2 },
+      { mode: "live", label: "wrapping up",     time: "⏱ ~0m20s left", bar: 97, phase: "tst", warn: 2 }
+    ];
+
+    function render(f) {
+      label.textContent = f.label;
+      chip.classList.toggle("warn", !!f.warn);
+      chip.classList.remove("pulse");
+
+      if (f.mode === "estimate") {
+        chip.innerHTML = '<span class="time">' + f.time + "</span>";
+        return;
+      }
+
+      chip.innerHTML =
+        '<span class="time">' + f.time + '</span>' +
+        '<span class="bar"><span class="bar-fill" style="width:' + f.bar + '%"></span></span>' +
+        '<span class="phase">' + f.phase + '</span>' +
+        '<span class="warncount">+' + f.warn + '⚠</span>';
+
+      if (f.pulse) requestAnimationFrame(function () { chip.classList.add("pulse"); });
+    }
+
+    if (reduced) {
+      render(frames[9]);
+    } else {
+      var i = 0;
+      render(frames[0]);
+      setInterval(function () {
+        i = (i + 1) % frames.length;
+        render(frames[i]);
+      }, 1000);
+    }
+  })();
+
+  document.getElementById("copy-btn").addEventListener("click", function (e) {
+    var btn = e.currentTarget;
+    var text = btn.getAttribute("data-copy");
+    var original = btn.textContent;
+    function done(ok) {
+      btn.textContent = ok ? "Copied" : "Select & copy: " + text;
+      setTimeout(function () { btn.textContent = original; }, 1600);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { done(true); }, function () { done(false); });
+    } else {
+      done(false);
+    }
+  });
+</script>
+</body>
+</html>
