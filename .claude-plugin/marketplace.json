@@ -1,6 +1,9 @@
 {
   "name": "claude-eta",
-  "owner": "ben564885",
+  "owner": {
+    "name": "ben564885"
+  },
+  "description": "Marketplace for claude-eta, a live ETA plugin for Claude Code runs.",
   "plugins": [
     {
       "name": "claude-eta",
