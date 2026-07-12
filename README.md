@@ -89,6 +89,34 @@ That'll print something like
 pick up. Without this step claude-eta still works fine — you just get the
 instant estimate at submit time, not the ticking countdown.
 
+## Upgrading
+
+Custom git-based marketplaces (this one included) don't auto-update on
+startup — only Anthropic's official marketplace does. To pull in a new
+release:
+
+```
+/plugin marketplace update claude-eta
+```
+
+```
+/reload-plugins
+```
+
+`/reload-plugins` alone only reloads whatever's already cached locally — it
+won't fetch new commits. Run the `marketplace update` command first, then
+`/reload-plugins` to apply the hooks/commands from the new version in your
+current session (no restart needed).
+
+If you set up the statusline (above), its path is version-pinned —
+`.../claude-eta/claude-eta/1.1.0/scripts/statusline.mjs` becomes
+`.../2.0.0/scripts/statusline.mjs` after an upgrade. Re-run the `find`
+command from step 2 above and update the path in `~/.claude/settings.json`,
+or the statusline will silently keep running the old version.
+
+Nothing needs to change for the learning data itself — `~/.claude/eta/`
+carries forward automatically; see below.
+
 ## What you'll see
 
 - **At submit** — an instant range based on your prompt's length, file
@@ -160,8 +188,16 @@ claude-eta — 64 runs logged
   learned phase modifiers: debug 1.62x, test 1.21x
 ```
 
-Want to wipe what it's learned and start over (e.g. after a big workflow
-change)?
+**No manual training step — just use Claude Code normally.** Every `Stop`
+hook writes one row and, once history is long enough, retrains
+`model.json` automatically. There's nothing to trigger by hand.
+
+One note if you're upgrading from a version before the model-tag fix (see
+`CHANGELOG.md`): older history rows may have `unknown:normal` as the
+bucket, since the model field wasn't being captured yet. That old bucket
+just stops accumulating new data — it's inert clutter, not actively wrong,
+so you don't need to clear it. If you'd rather start with clean buckets
+anyway:
 
 ```
 /eta-reset
