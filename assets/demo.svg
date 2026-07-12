@@ -39,10 +39,11 @@
     <!-- statusline block -->
     <text x="28" y="336" font-size="13" fill="#565b70">— live statusline, mid-run —</text>
 
-    <rect x="28" y="356" width="560" height="46" rx="8" fill="#1a1d29" stroke="#2a2e42"/>
+    <rect x="28" y="356" width="620" height="46" rx="8" fill="#1a1d29" stroke="#2a2e42"/>
     <text x="48" y="386" font-size="16" fill="#f5c451">⏱ ~3m10s left</text>
     <text x="220" y="386" font-size="16" fill="#6ee7b7">███░░░░░</text>
-    <text x="330" y="386" font-size="16" fill="#e0777a">+2⚠</text>
+    <text x="330" y="386" font-size="16" fill="#8f96ad">dbg</text>
+    <text x="380" y="386" font-size="16" fill="#e0777a">+2⚠</text>
 
     <text x="28" y="432" font-size="13" fill="#565b70">estimate widens at submit, narrows and revises as work happens — never a fake-precise number</text>
   </g>

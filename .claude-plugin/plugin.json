@@ -1,6 +1,6 @@
 {
   "name": "claude-eta",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Live ETA for the current Claude Code run: an instant range at submit time, a statusline countdown that revises itself as work progresses, and a content-free local history log for future model training.",
   "author": {
     "name": "ben564885"

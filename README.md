@@ -58,41 +58,94 @@ time, not the ticking countdown.
   passes, and jumps back *up* when the run hits trouble:
 
   ```
-  ⏱ ~3m10s left ███░░░░░ +2⚠
+  ⏱ ~3m10s left ███░░░░░ dbg +2⚠
   ```
 
+  `dbg` is the phase Claude's currently in (`exp`/`edit`/`tst`/`dbg`/`oth`).
   `+2⚠` means two issues (errors, failed tests, tracebacks) have shown up
   since submit — that's what just widened your ETA.
+
+## It learns from your own runs
+
+Every finished run reports its predicted-vs-actual time back to a small
+local calibration file. claude-eta tracks a running correction factor per
+`model:mode` combination (e.g. `opus:normal` runs consistently longer than
+predicted → future opus/normal estimates scale up), blended with a global
+fallback so one noisy run doesn't overcorrect everything. No training step,
+no network call — it's a running average that updates itself after every
+run.
+
+Check on it any time:
+
+```
+/eta-stats
+```
+
+```
+claude-eta — 14 runs logged
+
+  median error:                  38%
+  median actual/predicted ratio: 1.12x
+
+  learned calibration (global): 1.15x over 14 runs
+
+  by model:mode bucket:
+    opus:normal        1.34x  (n=6)
+    sonnet:normal      0.92x  (n=8)
+```
+
+Want to wipe what it's learned and start over (e.g. after a big workflow
+change)?
+
+```
+/eta-reset
+```
 
 ## How it works
 
 Three lightweight hooks and one small state file per session
 (`~/.claude/eta/state/<session_id>.json`):
 
-- **`UserPromptSubmit`** — computes the instant estimate and writes fresh
-  session state. Pure local computation, no network calls.
+- **`UserPromptSubmit`** — computes the instant estimate (heuristics +
+  learned calibration) and writes fresh session state. Pure local
+  computation, no network calls.
 - **`PostToolUse`** — fires after every tool call, classifies it into a phase
   (`explore → edit → test → debug → other`), and revises the estimate as
   issues and phase time accumulate.
-- **`Stop`** — closes out the run and appends one row to
-  `~/.claude/eta/history.jsonl` for future versions to learn from.
+- **`Stop`** — closes out the run, appends one row to
+  `~/.claude/eta/history.jsonl`, and reports the predicted-vs-actual outcome
+  to the calibration file.
 
-Zero runtime dependencies, zero network calls — it's all plain Node.js
-reading and writing local JSON.
+State lives under `~/.claude/eta/` by default; set `CLAUDE_ETA_HOME` to
+relocate it. Zero runtime dependencies, zero network calls — it's all plain
+Node.js reading and writing local JSON.
 
 ## Privacy
 
 Only the **shape** of a run is ever recorded — model, mode, prompt length,
-file-reference count, phase timings, tool/issue counts, durations.
-**Prompt text and tool output are never stored, anywhere.** Everything lives
-locally under `~/.claude/eta/`; nothing leaves your machine.
+file-reference count, phase timings, tool/issue counts, durations, and the
+predicted-vs-actual timing used for calibration. **Prompt text and tool
+output are never stored, anywhere.** Everything lives locally under
+`~/.claude/eta/`; nothing leaves your machine.
+
+## Development
+
+Zero dependencies, so there's no install step — just run the tests:
+
+```
+npm test
+```
+
+(`node --test tests/*.test.mjs` directly works too.) CI runs the same
+command on every push to `main`.
 
 ## Roadmap
 
-v1 (this release) is a heuristic estimator — reasonable seeds, not a trained
-model. `lib/model.mjs` is the entire seam: v2 will train on your own
-`history.jsonl` and do real Bayesian updating over the phase sequence, with
-no other file needing to change.
+The estimator (`lib/model.mjs`) combines fixed heuristics with the online
+self-calibration described above — a running correction factor, not a
+trained model. That's the whole seam for a real v2: swap in a proper
+Bayesian posterior over the semi-Markov phases, trained on the full
+`history.jsonl`, with no other file needing to change.
 
 ## License
 

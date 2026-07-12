@@ -74,3 +74,44 @@ Phase 4 smoke tests were run against a live `~/.claude/eta/` directory (that
 path didn't exist before this session). After confirming all five steps
 passed, I deleted that directory so the fake smoke-test session doesn't
 pollute the real history log the plugin will build up for you.
+
+## v1.1: self-calibration + feature audit (2026-07-12, unattended)
+
+You asked whether the plugin trains on its own predicted-vs-actual data —
+it didn't yet (only logged it). Implemented `lib/calibration.mjs`: an online
+EMA of log-space bias per `model:mode` bucket plus a shrinkage-damped global
+fallback, applied by `estimateInitial()`. Pushed as its own commit first.
+
+You then asked for a full feature audit, implemented without stopping to
+ask questions. Decisions made along the way:
+
+- **Kept the zero-network-calls invariant firm** even though "audit +
+  implement everything" is broad license — that's a stated privacy promise
+  in the README, not just an internal implementation detail, so I treated it
+  as out of scope to touch regardless.
+- **`/eta-stats` and `/eta-reset` slash commands** (`commands/*.md`) — the
+  two most obviously missing pieces once calibration exists: a way to see
+  what's been learned, and a way to reset it. `/eta-reset`'s command file
+  tells Claude to confirm with the user before running — that's the shipped
+  plugin asking its future user, not me asking during this build, so it
+  doesn't conflict with "don't ask any questions."
+- **Statusline phase tag** (`exp`/`edit`/`tst`/`dbg`/`oth`) — the state
+  already tracked `phase`; the statusline just wasn't surfacing it.
+- **`CLAUDE_ETA_HOME` env var** on `state.mjs`/`calibration.mjs` — added
+  primarily so the test suite never touches a real user's `~/.claude/eta`,
+  but also a legitimate feature for anyone who wants state elsewhere.
+- **Test suite** (`tests/*.test.mjs`, Node's built-in `node --test` +
+  `node:assert/strict` — zero new dependencies) and a GitHub Actions
+  workflow running it on push/PR. `readStdin()` gained an optional `stream`
+  parameter (default `process.stdin`) purely so it's testable without
+  spawning a real subprocess; behavior is unchanged for every existing
+  caller.
+- **`package.json`** — added despite the original build explicitly noting
+  its *absence* as a "zero deps" signal. It carries `"dependencies": {}` /
+  `"devDependencies": {}` (still literally zero deps) and exists only to
+  hold `npm test` and `engines.node` for CI/contributors — not a shift in
+  the zero-dependency stance.
+- Bumped to `1.1.0` (`plugin.json`), added `CHANGELOG.md`.
+- Did **not** add: a trained model, batch training script, real
+  Bayesian/hazard-rate posterior, or token-level signal — those are still
+  explicitly v2, and the audit didn't change that boundary.

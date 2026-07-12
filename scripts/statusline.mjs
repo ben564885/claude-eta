@@ -3,6 +3,7 @@
 
 import { readStdin, sidOf, fmt } from "../lib/util.mjs";
 import { readState } from "../lib/state.mjs";
+import { PHASE_LABELS } from "../lib/phases.mjs";
 
 const BAR_CELLS = 8;
 
@@ -25,5 +26,6 @@ const bar = "█".repeat(filled) + "░".repeat(BAR_CELLS - filled);
 
 const issues = state.issues ?? 0;
 const warn = issues > 0 ? ` +${issues}⚠` : "";
+const phaseTag = PHASE_LABELS[state.phase] ?? "";
 
-process.stdout.write(`⏱ ~${fmt(remaining)} left ${bar}${warn}`);
+process.stdout.write(`⏱ ~${fmt(remaining)} left ${bar} ${phaseTag}${warn}`);
