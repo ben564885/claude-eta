@@ -7,3 +7,9 @@ Run this exact command with the Bash tool and show me its output verbatim (it's 
     node "$CLAUDE_PLUGIN_ROOT/scripts/stats.mjs"
 
 After showing the output, add one or two sentences of your own commentary — e.g. call out any bucket with a large correction factor or very few samples, or note if there isn't enough history yet to say much.
+
+If I ask how v2 compares to v1 (or ask to "backtest"), also run:
+
+    node "$CLAUDE_PLUGIN_ROOT/scripts/backtest.mjs"
+
+and show that output verbatim too.

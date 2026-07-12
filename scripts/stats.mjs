@@ -7,6 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { readHistory, etaRoot } from "../lib/state.mjs";
 import { fmt } from "../lib/util.mjs";
+import { loadArtifacts } from "../lib/train.mjs";
+import { QREG_MIN_RUNS } from "../lib/qreg.mjs";
 
 const CALIBRATION_FILE = path.join(etaRoot(), "calibration.json");
 
@@ -46,6 +48,17 @@ if (errors.length > 0) {
   console.log(`  median actual/predicted ratio: ${median(errors.map((e) => e.ratio)).toFixed(2)}x`);
 }
 
+// Band coverage — the honest metric for a range estimator: actuals should
+// land inside the initial p10–p90 band ~80% of the time. Only rows logged
+// by v2+ carry the band.
+const banded = rows.filter((r) => r.predicted_p10 > 0 && r.predicted_p90 > 0 && r.actual_sec > 0);
+if (banded.length > 0) {
+  const covered = banded.filter((r) => r.predicted_p10 <= r.actual_sec && r.actual_sec <= r.predicted_p90).length;
+  console.log(
+    `  band coverage (target ~80%):   ${((covered / banded.length) * 100).toFixed(0)}% of ${banded.length} run${banded.length === 1 ? "" : "s"}`
+  );
+}
+
 const cal = readCalibration();
 console.log(
   `\n  learned calibration (global): ${Math.exp(cal.global.bias).toFixed(2)}x over ${cal.global.n} run${cal.global.n === 1 ? "" : "s"}`
@@ -60,7 +73,23 @@ if (bucketNames.length > 0) {
   }
 }
 
+const artifacts = loadArtifacts();
+if (artifacts) {
+  const qreg = artifacts.qreg
+    ? `active (trained on ${artifacts.qreg.n} runs)`
+    : `inactive (activates at ${QREG_MIN_RUNS} runs; ${rows.length} logged)`;
+  console.log(`\n  trained model:  quantile regression ${qreg}`);
+  const mods = Object.entries(artifacts.phase_mods ?? {})
+    .filter(([, v]) => Math.abs(v - 1) > 0.01)
+    .map(([k, v]) => `${k} ${v.toFixed(2)}x`);
+  if (mods.length > 0) console.log(`  learned phase modifiers: ${mods.join(", ")}`);
+} else {
+  console.log(`\n  trained model:  none yet (first training at 12 runs; qreg at ${QREG_MIN_RUNS})`);
+}
+
 console.log("\n  last 5 runs:");
 for (const r of rows.slice(-5)) {
   console.log(`    predicted ${fmt(r.predicted_p50)}, actual ${fmt(r.actual_sec)}`);
 }
+
+console.log('\n  backtest (v1 vs v2 replayed on your own history): node "$CLAUDE_PLUGIN_ROOT/scripts/backtest.mjs"');

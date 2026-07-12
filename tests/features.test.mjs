@@ -26,6 +26,11 @@ test("recognizes thinking mode and sonnet/haiku model families", () => {
   assert.equal(extractFeatures("x", { model: "claude-haiku-4-5", mode: "extended-thinking" }).mode, "thinking");
 });
 
+test("recognizes the fable/mythos model family", () => {
+  assert.equal(extractFeatures("x", { model: "claude-fable-5" }).model, "fable");
+  assert.equal(extractFeatures("x", { model: "claude-mythos-5" }).model, "fable");
+});
+
 test("handles a non-string prompt without throwing", () => {
   const f = extractFeatures(undefined, {});
   assert.equal(f.len_words, 0);

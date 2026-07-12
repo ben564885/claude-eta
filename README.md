@@ -105,15 +105,37 @@ instant estimate at submit time, not the ticking countdown.
   `+2⚠` means two issues (errors, failed tests, tracebacks) have shown up
   since submit — that's what just widened your ETA.
 
-## It learns from your own runs
+## It trains on your own runs
 
-Every finished run reports its predicted-vs-actual time back to a small
-local calibration file. claude-eta tracks a running correction factor per
-`model:mode` combination (e.g. `opus:normal` runs consistently longer than
-predicted → future opus/normal estimates scale up), blended with a global
-fallback so one noisy run doesn't overcorrect everything. No training step,
-no network call — it's a running average that updates itself after every
-run.
+Every finished run feeds three layers of local learning (no network calls,
+no training infrastructure — plain math over `~/.claude/eta/history.jsonl`):
+
+1. **Bayesian calibration** from run one: a posterior over the estimator's
+   log-space bias per `model:mode` bucket (e.g. `opus:normal` runs
+   consistently longer than predicted → future opus estimates scale up),
+   shrunk toward a global posterior so a few noisy runs can't overcorrect
+   everything. The width of the p10–p90 band comes from this posterior too,
+   so bands tighten as evidence accumulates.
+2. **A trained model** once you have 50+ runs: linear quantile regression on
+   log-duration over your prompts' features (length, file refs, intent
+   flags, model, mode), fit by pinball-loss gradient descent right in the
+   Stop hook. It replaces the hand-tuned heuristic entirely and retrains
+   itself as history grows.
+3. **Survival-model countdowns** while a run is going: the statusline
+   reports quantiles of total duration *given the run is still going* under
+   a lognormal prior — so when a run blows past its estimate, remaining time
+   correctly grows instead of snapping to zero. How much longer debug-heavy
+   runs tend to drag on is itself learned from your history.
+
+And because "more accurate" should be a measurement, not a vibe, v2 ships a
+backtester: it replays your own history chronologically (training only on
+runs before each prediction) and scores v1's frozen heuristic against the
+v2 pipeline on pinball loss, band coverage, and median error. Ask for it via
+`/eta-stats` ("run the backtest") or directly:
+
+```
+node "$CLAUDE_PLUGIN_ROOT/scripts/backtest.mjs"
+```
 
 Check on it any time:
 
@@ -122,16 +144,20 @@ Check on it any time:
 ```
 
 ```
-claude-eta — 14 runs logged
+claude-eta — 64 runs logged
 
   median error:                  38%
   median actual/predicted ratio: 1.12x
+  band coverage (target ~80%):   78% of 64 runs
 
-  learned calibration (global): 1.15x over 14 runs
+  learned calibration (global): 1.15x over 64 runs
 
   by model:mode bucket:
-    opus:normal        1.34x  (n=6)
-    sonnet:normal      0.92x  (n=8)
+    opus:normal        1.34x  (n=26)
+    sonnet:normal      0.92x  (n=38)
+
+  trained model:  quantile regression active (trained on 60 runs)
+  learned phase modifiers: debug 1.62x, test 1.21x
 ```
 
 Want to wipe what it's learned and start over (e.g. after a big workflow
@@ -153,8 +179,9 @@ Three lightweight hooks and one small state file per session
   (`explore → edit → test → debug → other`), and revises the estimate as
   issues and phase time accumulate.
 - **`Stop`** — closes out the run, appends one row to
-  `~/.claude/eta/history.jsonl`, and reports the predicted-vs-actual outcome
-  to the calibration file.
+  `~/.claude/eta/history.jsonl`, reports the predicted-vs-actual outcome to
+  the calibration file, and retrains the learned artifacts (`model.json`)
+  when history has grown enough since the last training.
 
 State lives under `~/.claude/eta/` by default; set `CLAUDE_ETA_HOME` to
 relocate it. Zero runtime dependencies, zero network calls — it's all plain
@@ -181,11 +208,16 @@ command on every push to `main`.
 
 ## Roadmap
 
-The estimator (`lib/model.mjs`) combines fixed heuristics with the online
-self-calibration described above — a running correction factor, not a
-trained model. That's the whole seam for a real v2: swap in a proper
-Bayesian posterior over the semi-Markov phases, trained on the full
-`history.jsonl`, with no other file needing to change.
+v2 shipped the trained estimator (Bayesian calibration, quantile regression,
+survival-model revision — see `CHANGELOG.md`). What's left on the list:
+
+- **Shipped priors**: bake fitted coefficients into the repo as the default
+  starting point so fresh installs don't cold-start from heuristics.
+- **Richer in-flight signals**: subagent spawns and tool-call *rate* as
+  revision features (a stalled rate usually means the run is near its end).
+- **Per-phase sequence modeling**: history logs aggregate `phase_times`;
+  logging phase *transitions* would allow a true semi-Markov remaining-work
+  model instead of scalar phase modifiers.
 
 ## License
 

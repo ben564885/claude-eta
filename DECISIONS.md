@@ -115,3 +115,46 @@ ask questions. Decisions made along the way:
 - Did **not** add: a trained model, batch training script, real
   Bayesian/hazard-rate posterior, or token-level signal — those are still
   explicitly v2, and the audit didn't change that boundary.
+
+## v2.0.0: trained estimator (2026-07-12, unattended)
+
+Built per the "start on all of it, go 1 by 1, don't ask questions" brief.
+Decisions made along the way:
+
+- **Model-tag source**: the hook payloads carry no model field; the session
+  transcript (`transcript_path`) does, in each assistant entry. Submit-time
+  reads the tail for the previous turn's model (sticky within a session);
+  Stop-time re-resolves authoritatively before learning. Tail read capped at
+  256KB so the hook stays near-instant on multi-MB transcripts.
+- **Calibration test semantics changed intentionally**: the v1 test asserted
+  <1.5x transfer to an unrelated bucket after unanimous 2x misses. The
+  variance-aware posterior correctly transfers *more* when evidence is
+  unanimous (zero spread) — the guard is against few/noisy samples, and a
+  new test pins exactly that. Threshold relaxed to "never full transfer".
+- **Bayesian constants** (`calibration.mjs`): TAU_GLOBAL=0.2 (heuristic
+  believed globally right within ~1.5x at 2sd), TAU_BUCKET=0.5, noise prior
+  0.75 carrying 8 pseudo-runs, band sigma clamped to [0.25, 1.25]. Seeds,
+  not sacred — same spirit as v1's constants.
+- **Quantile regression stays linear** (no boosting/NN): three pinball-loss
+  fits over 13 features, full-batch, fixed 300 epochs, no RNG → identical
+  retrains on identical history. Activates at 50 runs; retrains in the Stop
+  hook every 5 new runs (a few ms for hundreds of rows).
+- **revise() applies no bias factor on the qreg path's prior** and qreg
+  predictions never get the calibration multiplier — both are trained on
+  actuals; stacking the correction would double-count it.
+- **Tail cap in survival math** (F_CAP=0.995): deep past the estimate, the
+  conditional lognormal quantiles explode; capping the conditioning point
+  holds the band finite ("way past p99.5, hold here") instead of quoting
+  absurd hours.
+- **Phase mods from aggregates**: history logs per-run phase *totals*, not
+  transition sequences, so mods are geometric-mean ratios ("runs featuring
+  debug run 1.6x longer"), not a true semi-Markov chain. Logging transitions
+  is on the roadmap; not retrofitted here to keep history rows content-free
+  and small.
+- **Backtest feedback loop matches production**: during replay, calibration
+  learns from each run's *v2* prediction (as finalize.mjs does), not the
+  frozen heuristic's — the comparison measures the pipeline users actually
+  get.
+- On this machine's real 11-run history the backtest reads: v1 band
+  coverage 27% / median |err| 200% vs v2 73% / 86% — qreg still inactive,
+  so that's the Bayesian layer alone.
