@@ -4,6 +4,7 @@
 
 import { readStdin, sidOf } from "../lib/util.mjs";
 import { readState, clearState, appendHistory } from "../lib/state.mjs";
+import { recordOutcome } from "../lib/calibration.mjs";
 
 const input = await readStdin();
 const sid = sidOf(input);
@@ -27,5 +28,7 @@ appendHistory({
   predicted_p50: state.p50_prior,
   actual_sec: actualSec,
 });
+
+recordOutcome(state.features, state.p50_prior, actualSec);
 
 clearState(sid);
