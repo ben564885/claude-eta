@@ -3,27 +3,16 @@
 // and the calibration claude-eta has learned from it so far. Invoked via the
 // /eta-stats slash command; safe to run any time — read-only.
 
-import fs from "node:fs";
-import path from "node:path";
-import { readHistory, etaRoot } from "../lib/state.mjs";
+import { readHistory } from "../lib/state.mjs";
 import { fmt } from "../lib/util.mjs";
 import { loadArtifacts } from "../lib/train.mjs";
 import { QREG_MIN_RUNS } from "../lib/qreg.mjs";
-
-const CALIBRATION_FILE = path.join(etaRoot(), "calibration.json");
+import { describe } from "../lib/calibration.mjs";
 
 function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-function readCalibration() {
-  try {
-    return JSON.parse(fs.readFileSync(CALIBRATION_FILE, "utf8"));
-  } catch {
-    return { global: { bias: 0, n: 0 }, buckets: {} };
-  }
 }
 
 const rows = readHistory();
@@ -59,17 +48,15 @@ if (banded.length > 0) {
   );
 }
 
-const cal = readCalibration();
+const cal = describe();
 console.log(
-  `\n  learned calibration (global): ${Math.exp(cal.global.bias).toFixed(2)}x over ${cal.global.n} run${cal.global.n === 1 ? "" : "s"}`
+  `\n  learned calibration (global): ${cal.global.factor.toFixed(2)}x over ${cal.global.n} run${cal.global.n === 1 ? "" : "s"}`
 );
 
-const bucketNames = Object.keys(cal.buckets ?? {});
-if (bucketNames.length > 0) {
+if (cal.buckets.length > 0) {
   console.log("\n  by model:mode bucket:");
-  for (const name of bucketNames) {
-    const b = cal.buckets[name];
-    console.log(`    ${name.padEnd(18)} ${Math.exp(b.bias).toFixed(2)}x  (n=${b.n})`);
+  for (const b of cal.buckets) {
+    console.log(`    ${b.key.padEnd(18)} ${b.factor.toFixed(2)}x  (n=${b.n})`);
   }
 }
 

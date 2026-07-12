@@ -158,3 +158,66 @@ Decisions made along the way:
 - On this machine's real 11-run history the backtest reads: v1 band
   coverage 27% / median |err| 200% vs v2 73% / 86% — qreg still inactive,
   so that's the Bayesian layer alone.
+
+## v2.1.0: dashboard + a real bug found along the way (2026-07-12, unattended)
+
+Built in response to "is there a training dashboard?" Decisions made along
+the way:
+
+- **Found and fixed a live bug before building on top of it**: `stats.mjs`
+  read `calibration.json` directly and called `Math.exp(entry.bias)`, but
+  v2's schema is `{n, mean, m2}` — `.bias` is always `undefined`, so every
+  calibration line in `/eta-stats` printed `NaN` on any real machine that
+  had actually recorded a v2 outcome (confirmed live on this machine's real
+  `~/.claude/eta/`, not just synthetically). Root cause: the schema change
+  in v2.0.0 wasn't propagated to the one caller reading the file directly
+  instead of through an export. Fix: `lib/calibration.mjs` now exports
+  `describe()`, which returns the exact shrinkage-blended factors
+  `estimateInitial()` actually applies — display and behavior share one
+  source of truth, so they can't drift apart again the way they just did.
+- **Extracted `lib/backtest.mjs` from `scripts/backtest.mjs`** before
+  writing the dashboard, rather than importing the CLI script or
+  duplicating its replay loop — the CLI text output and the dashboard's
+  charts now come from one `runBacktest()` call, guaranteeing they always
+  agree.
+- **Followed the gstack `dataviz` skill's procedure in full** (form before
+  color, six-checks validator, marks/anatomy, table-view twin per chart):
+  diverging blue/red for calibration bias (a measure with a real zero point,
+  1.0x); a single accent hue + de-emphasis gray for the v1-vs-v2 comparison
+  (emphasis pattern — the story is "v2 improved on v1," not "compare N
+  series"); the status pair (good/critical) for scatter points, since
+  in-band/out-of-band is genuinely a state, not an identity. Ran
+  `validate_palette.js` on both pairs against both surfaces before using
+  them (PASS on all checks).
+- **Actually rendered and looked at it** (step 7 of the dataviz procedure,
+  easy to skip) — headless-Chrome-screenshotted the dashboard against a
+  synthetic 80-run dataset, the real small history, and an empty state, in
+  both color schemes, rather than trusting the generated numbers alone.
+  This caught two real defects no amount of staring at the code would have:
+  (1) the v1-vs-v2 backtest chart originally shared one x-scale across
+  pinball loss (seconds, ~10-20 magnitude) and two percentage metrics
+  (0-100) — functionally the same misleading-comparison failure as a
+  dual-axis chart, just on bar length instead of two y-axes. Fixed by
+  giving each metric row its own scale (small multiples), with a caption
+  note so readers don't compare bar length *across* rows. (2) An extreme
+  bucket bias factor (the real `unknown:normal` legacy bucket on this
+  machine, factor ≈0.33x from real accumulated history) pushed its
+  diverging bar's value label far enough left to visually collide with the
+  bucket-name column. Fixed with a fixed name column + reserved label
+  gutter that caps bar length so the worst-case bucket's label can never
+  cross into the name column, regardless of how extreme the factor gets —
+  and pinned as a regression test that asserts this geometric invariant
+  rather than eyeballing one screenshot.
+- **`unknown:` buckets get a one-line explanatory note** in the chart
+  caption (linking the behavior already documented in the README) rather
+  than being hidden or specially sorted — it's real data, just legacy, and
+  hiding it would be less honest than a one-line "this predates a bug fix."
+- **`/eta-reset` now also clears `dashboard.html`**: leaving a stale
+  generated report around after a reset would let it keep showing numbers
+  that no longer reflect (now-empty) calibration state — a subtler version
+  of the exact NaN-drift bug this session started by fixing.
+- **Used a real, current screenshot as the README's dashboard image**
+  (`assets/dashboard-demo.png`, from actual local synthetic data run
+  through the real renderer) rather than a hand-drawn mockup like
+  `assets/demo.svg` — the dashboard is a real artifact with real output to
+  show, so there was no need to fake one.

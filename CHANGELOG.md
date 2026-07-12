@@ -1,5 +1,27 @@
 # Changelog
 
+## 2.1.0
+
+- **`/eta-dashboard`** — new slash command that generates a self-contained
+  local HTML report (`~/.claude/eta/dashboard.html`) and opens it in your
+  default browser: stat tiles, a diverging bar chart of per-bucket
+  calibration bias, a v1-vs-v2 backtest comparison, and a log-scale
+  predicted-vs-actual scatter colored by band hit/miss. Hand-rolled inline
+  SVG, no charting library, no network requests — same zero-dependency,
+  nothing-leaves-your-machine invariant as everything else. `/eta-reset`
+  now also clears the last generated dashboard so it can't show stale
+  numbers after a reset.
+- **Fixed:** `/eta-stats` was printing `NaN` for every calibration line
+  (global and per-bucket) once v2's Bayesian calibration had recorded
+  anything — it read the on-disk file's raw `{mean, m2}` shape as if it
+  were v1's `{bias, n}` shape. Fixed by adding `describe()` to
+  `lib/calibration.mjs`, which returns the exact shrinkage-blended factors
+  the estimator actually applies (not raw stored means), so display and
+  behavior can never drift apart again.
+- `lib/backtest.mjs` extracted from `scripts/backtest.mjs` so the CLI
+  backtester and the new dashboard score identically off one
+  implementation instead of two copies of the replay logic.
+
 ## 2.0.0
 
 v2: the estimator now trains on your own run history. Still zero

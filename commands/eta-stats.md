@@ -13,3 +13,5 @@ If I ask how v2 compares to v1 (or ask to "backtest"), also run:
     node "$CLAUDE_PLUGIN_ROOT/scripts/backtest.mjs"
 
 and show that output verbatim too.
+
+If I ask for a dashboard, charts, or something visual, run `/eta-dashboard` instead.

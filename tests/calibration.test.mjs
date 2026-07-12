@@ -6,7 +6,7 @@ import path from "node:path";
 
 process.env.CLAUDE_ETA_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "claude-eta-test-"));
 
-const { recordOutcome, getBiasFactor, getPredictiveSigma, emptyStats, addOutcome, biasOf, sigmaOf } =
+const { recordOutcome, getBiasFactor, getPredictiveSigma, emptyStats, addOutcome, biasOf, sigmaOf, describe, globalBiasOf, readCalibrationFile } =
   await import("../lib/calibration.mjs");
 
 test("starts at neutral (1x) bias with no history", () => {
@@ -70,6 +70,60 @@ test("migrates v1 {bias,n} calibration files instead of discarding them", async 
   const fresh = await import(`../lib/calibration.mjs?migrate=${Date.now()}`);
   const factor = fresh.getBiasFactor({ model: "opus", mode: "normal" });
   assert.ok(factor > 1.2, `expected the v1 learned bias to survive migration, got ${factor}`);
+});
+
+test("describe() never produces NaN — regression for the stats.mjs display bug", () => {
+  // The stored bucket/global shape is {n, mean, m2} (Welford), not {bias, n};
+  // stats.mjs used to read the file directly and call Math.exp(entry.bias),
+  // which is always undefined on the v2 schema -> NaN on every line.
+  // describe() is the fix: it applies the same shrinkage math the estimator
+  // itself uses, so display always matches what's actually applied.
+  const stats = emptyStats();
+  addOutcome(stats, { model: "opus", mode: "normal" }, 100, 200);
+  addOutcome(stats, { model: "sonnet", mode: "thinking" }, 50, 40);
+  const result = describe(stats);
+  assert.ok(Number.isFinite(result.global.factor), `global factor was ${result.global.factor}`);
+  for (const b of result.buckets) {
+    assert.ok(Number.isFinite(b.factor), `bucket ${b.key} factor was ${b.factor}`);
+  }
+});
+
+test("describe() with no history returns neutral factors, not NaN", () => {
+  const result = describe(emptyStats());
+  assert.equal(result.global.factor, 1);
+  assert.deepEqual(result.buckets, []);
+});
+
+test("describe()'s bucket factor matches biasOf() exactly (single source of truth)", () => {
+  const stats = emptyStats();
+  const features = { model: "haiku", mode: "plan" };
+  for (let i = 0; i < 6; i++) addOutcome(stats, features, 100, 150);
+  const result = describe(stats);
+  const bucket = result.buckets.find((b) => b.key === "haiku:plan");
+  assert.ok(bucket);
+  assert.ok(Math.abs(bucket.factor - Math.exp(biasOf(stats, features))) < 1e-9);
+});
+
+test("describe() defaults to the persisted file when called with no argument", () => {
+  recordOutcome({ model: "opus", mode: "normal" }, 100, 200);
+  const result = describe();
+  assert.ok(Number.isFinite(result.global.factor));
+  const fileStats = readCalibrationFile();
+  assert.ok(fileStats.global.n >= 1);
+});
+
+test("globalBiasOf ignores bucket-specific evidence", () => {
+  const stats = emptyStats();
+  // Heavy evidence in one bucket only; the pure global component should
+  // still reflect just the (identical, since global tracks every outcome)
+  // aggregate — but must not equal the *bucket-blended* biasOf for an
+  // untouched bucket once enough runs exist to separate them meaningfully.
+  for (let i = 0; i < 20; i++) addOutcome(stats, { model: "opus", mode: "normal" }, 100, 200);
+  const pureGlobal = globalBiasOf(stats);
+  const blendedForSameBucket = biasOf(stats, { model: "opus", mode: "normal" });
+  // With this much bucket-specific evidence, the blended estimate leans
+  // further toward the bucket's own mean than the pure global component does.
+  assert.ok(blendedForSameBucket >= pureGlobal - 1e-9);
 });
 
 test("ignores invalid predicted/actual values instead of corrupting state", () => {

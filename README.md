@@ -203,6 +203,21 @@ anyway:
 /eta-reset
 ```
 
+Want it visual instead of text? `/eta-dashboard` generates a self-contained
+local HTML report — stat tiles, per-bucket calibration bars, the v1-vs-v2
+backtest comparison, and a predicted-vs-actual scatter — and opens it in
+your browser:
+
+```
+/eta-dashboard
+```
+
+<img src="assets/dashboard-demo.png" alt="claude-eta dashboard: stat tiles for runs/error/coverage, a diverging bar chart of calibration bias per bucket, a v1-vs-v2 backtest comparison, and a log-scale predicted-vs-actual scatter" width="500" />
+
+Same rules as everywhere else in this plugin: hand-rolled inline SVG, no
+charting library, no network requests — the HTML file lives at
+`~/.claude/eta/dashboard.html` and never leaves your machine.
+
 ## How it works
 
 Three lightweight hooks and one small state file per session

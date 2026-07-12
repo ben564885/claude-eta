@@ -7,7 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { etaRoot } from "../lib/state.mjs";
 
-const targets = ["calibration.json", "history.jsonl", "model.json"];
+const targets = ["calibration.json", "history.jsonl", "model.json", "dashboard.html"];
 const cleared = [];
 
 for (const name of targets) {
