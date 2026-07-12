@@ -1,0 +1,11 @@
+{
+  "name": "claude-eta",
+  "owner": "ben564885",
+  "plugins": [
+    {
+      "name": "claude-eta",
+      "source": "./",
+      "description": "Live ETA for the current Claude Code run."
+    }
+  ]
+}

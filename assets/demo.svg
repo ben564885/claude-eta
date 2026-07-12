@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 460" width="900" height="460" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#161821"/>
+      <stop offset="100%" stop-color="#0d0e14"/>
+    </linearGradient>
+    <clipPath id="round">
+      <rect x="0" y="0" width="900" height="460" rx="14" ry="14"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#round)">
+    <rect x="0" y="0" width="900" height="460" fill="url(#bg)"/>
+
+    <!-- title bar -->
+    <rect x="0" y="0" width="900" height="40" fill="#1c1f2b"/>
+    <circle cx="24" cy="20" r="6" fill="#ff5f56"/>
+    <circle cx="46" cy="20" r="6" fill="#ffbd2e"/>
+    <circle cx="68" cy="20" r="6" fill="#27c93f"/>
+    <text x="450" y="25" fill="#7a7f95" font-size="13" text-anchor="middle">claude</text>
+
+    <!-- prompt -->
+    <text x="28" y="80" font-size="15" fill="#6ee7b7">❯</text>
+    <text x="48" y="80" font-size="15" fill="#e6e7ee">refactor the auth module and add tests for the login flow</text>
+
+    <!-- instant estimate -->
+    <text x="28" y="118" font-size="14" fill="#8f96ad">⏱ est. ~1m31s–10m21s</text>
+
+    <!-- claude working -->
+    <text x="28" y="164" font-size="14" fill="#565b70">● Reading src/auth.ts</text>
+    <text x="28" y="190" font-size="14" fill="#565b70">● Editing src/login.ts</text>
+    <text x="28" y="216" font-size="14" fill="#565b70">● Running npm test</text>
+    <text x="28" y="242" font-size="14" fill="#e0777a">  3 tests failed — Error: expected true to be false</text>
+    <text x="28" y="268" font-size="14" fill="#565b70">● debugging…</text>
+
+    <!-- divider -->
+    <line x1="0" y1="300" x2="900" y2="300" stroke="#22263a" stroke-width="1"/>
+
+    <!-- statusline block -->
+    <text x="28" y="336" font-size="13" fill="#565b70">— live statusline, mid-run —</text>
+
+    <rect x="28" y="356" width="560" height="46" rx="8" fill="#1a1d29" stroke="#2a2e42"/>
+    <text x="48" y="386" font-size="16" fill="#f5c451">⏱ ~3m10s left</text>
+    <text x="220" y="386" font-size="16" fill="#6ee7b7">███░░░░░</text>
+    <text x="330" y="386" font-size="16" fill="#e0777a">+2⚠</text>
+
+    <text x="28" y="432" font-size="13" fill="#565b70">estimate widens at submit, narrows and revises as work happens — never a fake-precise number</text>
+  </g>
+</svg>
