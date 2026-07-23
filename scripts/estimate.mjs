@@ -3,12 +3,24 @@
 // network/LLM calls — this blocks the turn and has a 30s timeout upstream.
 
 import { readStdin, sidOf, fmt, modelFromTranscript } from "../lib/util.mjs";
-import { writeState, sweepStale } from "../lib/state.mjs";
+import { writeState, sweepStale, readRepoCache, writeRepoCache, takePendingGuess } from "../lib/state.mjs";
 import { extractFeatures } from "../lib/features.mjs";
 import { estimateInitial } from "../lib/model.mjs";
+import { scanRepo } from "../lib/repo.mjs";
 
 const input = await readStdin();
 const sid = sidOf(input);
+
+// Repo shape barely changes turn-to-turn; scan once per session and cache it
+// rather than shelling out to git on every submit (see lib/state.mjs).
+let repo = readRepoCache(sid);
+if (repo === null) {
+  repo = scanRepo(input.cwd) ?? {};
+  writeRepoCache(sid, repo);
+}
+
+// Set by a preceding /eta-guess <seconds>; applies to this turn only.
+const devEstimateSec = takePendingGuess(sid);
 
 const prompt = input.prompt ?? input.user_prompt ?? input.userPrompt ?? "";
 // The hook payload has no model field; the transcript's last assistant entry
@@ -29,6 +41,8 @@ const now = Date.now();
 writeState(sid, {
   t_start: now,
   features,
+  repo,
+  dev_estimate_sec: devEstimateSec,
   p50_prior: p50,
   p10_prior: p10,
   p90_prior: p90,

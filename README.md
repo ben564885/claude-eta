@@ -218,6 +218,16 @@ Same rules as everywhere else in this plugin: hand-rolled inline SVG, no
 charting library, no network requests — the HTML file lives at
 `~/.claude/eta/dashboard.html` and never leaves your machine.
 
+Want to see how your own gut-feel estimate compares to the model's? Log a
+guess right before you send a prompt:
+
+```
+/eta-guess 90
+```
+
+It's recorded as `dev_estimate_sec` against whichever prompt you send next
+(within about 10 minutes — after that it's assumed unrelated and dropped).
+
 ## How it works
 
 Three lightweight hooks and one small state file per session
@@ -225,7 +235,10 @@ Three lightweight hooks and one small state file per session
 
 - **`UserPromptSubmit`** — computes the instant estimate (heuristics +
   learned calibration) and writes fresh session state. Pure local
-  computation, no network calls.
+  computation, no network calls. On a session's first turn only, also
+  scans the repo for shape (file count, LOC, language, ...) and caches the
+  result for the rest of the session — see Privacy below for exactly what's
+  derived and what's hashed.
 - **`PostToolUse`** — fires after every tool call, classifies it into a phase
   (`explore → edit → test → debug → other`), and revises the estimate as
   issues and phase time accumulate.
@@ -241,10 +254,20 @@ Node.js reading and writing local JSON.
 ## Privacy
 
 Only the **shape** of a run is ever recorded — model, mode, prompt length,
-file-reference count, phase timings, tool/issue counts, durations, and the
-predicted-vs-actual timing used for calibration. **Prompt text and tool
-output are never stored, anywhere.** Everything lives locally under
-`~/.claude/eta/`; nothing leaves your machine.
+file-reference count, imperative-verb count, phase timings, tool/issue
+counts, durations, the predicted-vs-actual timing used for calibration, and
+(as of 2.2.0) a small set of repo-shape numbers: tracked file count,
+approximate LOC, primary language, whether a test suite appears present,
+and whether the working tree is dirty. **Prompt text and tool output are
+never stored, anywhere**, and neither is the repo's path or remote URL —
+only a one-way SHA-256 hash of one of those (`repo_id`), so a later
+analysis can group runs by repository without the log ever naming it.
+Everything lives locally under `~/.claude/eta/`; nothing leaves your
+machine.
+
+If you use `/eta-guess <seconds>` to log your own duration estimate before
+sending a prompt, that number (`dev_estimate_sec`) is recorded too, against
+whichever prompt you send within the next 10 minutes.
 
 ## Development
 

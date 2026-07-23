@@ -2,7 +2,7 @@
 // Stop hook. Closes out the run: appends one content-free row to the local
 // history log, then clears session state.
 
-import { readStdin, sidOf, modelFromTranscript } from "../lib/util.mjs";
+import { readStdin, sidOf, modelFromTranscript, pluginVersion } from "../lib/util.mjs";
 import { readState, clearState, appendHistory } from "../lib/state.mjs";
 import { recordOutcome } from "../lib/calibration.mjs";
 import { normalizeModel } from "../lib/features.mjs";
@@ -30,7 +30,10 @@ const actualSec = Math.round((now - state.t_start) / 1000);
 
 appendHistory({
   ts: new Date(now).toISOString(),
+  session_id: sid,
+  plugin_version: pluginVersion(),
   features,
+  repo: state.repo ?? null,
   tools: state.tools ?? 0,
   issues: state.issues ?? 0,
   phase_times: phaseTimes,
@@ -38,6 +41,7 @@ appendHistory({
   predicted_p10: state.p10_prior,
   predicted_p90: state.p90_prior,
   actual_sec: actualSec,
+  dev_estimate_sec: state.dev_estimate_sec ?? null,
 });
 
 recordOutcome(features, state.p50_prior, actualSec);

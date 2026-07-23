@@ -36,3 +36,14 @@ test("handles a non-string prompt without throwing", () => {
   assert.equal(f.len_words, 0);
   assert.equal(f.file_refs, 0);
 });
+
+test("counts imperative verbs as a crude subtask-count proxy", () => {
+  // fix, add, test, update — 4 matches (RE_IMPERATIVE_VERB also matches
+  // "test" as a noun here; it's a bag-of-words count, not a parse).
+  const f = extractFeatures("fix the login bug, then add a test, then update the docs", {});
+  assert.equal(f.imperative_verbs, 4);
+});
+
+test("imperative_verbs is 0 for a prompt with no matching verbs", () => {
+  assert.equal(extractFeatures("what does this function return", {}).imperative_verbs, 0);
+});

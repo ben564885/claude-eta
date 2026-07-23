@@ -1,5 +1,35 @@
 # Changelog
 
+## 2.2.0
+
+Adds the logging groundwork for an offline duration-prediction study — none
+of this touches the live estimator (`lib/model.mjs`/`lib/qreg.mjs` are
+untouched; new fields are recorded but not fed into the trained model).
+
+- **`session_id` now recorded on every history row.** It was already read
+  off every hook call (`sidOf()`) but discarded before the row was written.
+  With it present, conversation depth, preceding-turn duration, and
+  accumulated within-session context length are all derivable later by
+  grouping/sorting `history.jsonl` — no further schema change needed for
+  those three.
+- **Repo-shape features**, scanned once per session and cached (not
+  re-shelled-out-to on every submit): tracked file count, approximate LOC,
+  primary language (by tracked-file-extension histogram), whether a test
+  suite appears present, and whether the working tree is dirty. Only a
+  SHA-256 hash of the repo's remote URL (or absolute path, for repos with
+  no remote) is persisted as `repo_id` — never the path or remote URL
+  itself, consistent with the existing privacy stance. Falls back to a
+  bounded `find`-based file count for non-git directories.
+- **`imperative_verbs`** — a bag-of-words count of common imperative verbs
+  in the prompt, alongside the existing boolean intent flags.
+- **`/eta-guess <seconds>`** — new slash command to log your own duration
+  estimate immediately before sending a prompt. It's attached to the very
+  next prompt only (a 10-minute handoff window; a guess older than that is
+  discarded rather than misattributed) and recorded as `dev_estimate_sec`.
+- **`plugin_version`** now stamped on every history row, so a later analysis
+  can separate "the model changed" from "the collector changed" when
+  reading a long collection window.
+
 ## 2.1.0
 
 - **`/eta-dashboard`** — new slash command that generates a self-contained
